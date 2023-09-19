@@ -1,0 +1,150 @@
+import cv2
+import pyttsx3
+import speech_recognition as sr
+import mysql.connector
+from mysql.connector import Error
+
+cam = cv2.VideoCapture(0)
+listener = sr.Recognizer()
+
+# Connect to the database
+try:
+    connection = mysql.connector.connect(
+        host='localhost',
+        database='hotel',
+        user='root',
+        password='Root'
+    )
+    if connection.is_connected():
+        print('Connected to MySQL database')
+except Error as e:
+    print('Error while connecting to MySQL', e)
+
+# Prepare a cursor object
+cursor = connection.cursor()
+
+while cam.isOpened():
+    ret, frame1 = cam.read()
+    ret, frame2 = cam.read()
+    rat, color_img = cam.read()
+
+    diff = cv2.absdiff(frame1, frame2)
+    gray = cv2.cvtColor(diff, cv2.COLOR_RGB2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, thresh = cv2.threshold(blur, 20, 255, cv2.THRESH_BINARY)
+    dilated = cv2.dilate(thresh, None, iterations=3)
+    contours, _ = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    for c in contours:
+        if cv2.contourArea(c) < 5000:
+            continue
+        x, y, w, h, = cv2.boundingRect(c)
+        cv2.rectangle(frame1, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        engine = pyttsx3.init()
+        rate = engine.getProperty('rate')
+        engine.setProperty('rate', 130)
+        voices = engine.getProperty('voices')
+        engine.setProperty('voice', voices[1].id)
+        engine.say('Excuse me! Stop a minute')
+        engine.say('Welcome to this hotel')
+        engine.say('I am your friend')
+        engine.say('My name is samiksha')
+        engine.say('How can I help you')
+        engine.runAndWait()
+
+        with sr.Microphone(sample_rate=16000, chunk_size=512) as source:
+            print('Please say something.....')
+            engine.say('Speaking completed..')
+            voice = listener.listen(source)
+            command = listener.recognize_google(voice)
+            command = command.lower()
+            print(command)
+            engine.runAndWait()
+
+        engine.say('OK then, could you please give me some details')
+        engine.say('First, tell me your good name')
+        engine.runAndWait()
+
+        with sr.Microphone(sample_rate=16000, chunk_size=512) as source:
+            print('Please say something.....')
+            engine.say('Speaking completed..')
+            voice = listener.listen(source)
+            name = listener.recognize_google(voice)
+            name = name.lower()
+            print(name)
+            engine.runAndWait()
+
+        engine.say('OK, where are you from?')
+        engine.runAndWait()
+
+        with sr.Microphone(sample_rate=16000, chunk_size=512) as source:
+            print('Please say something.....')
+            engine.say('Speaking completed..')
+            voice = listener.listen(source)
+            address = listener.recognize_google(voice)
+            address = address.lower()
+            print(address)
+            engine.runAndWait()
+
+        engine.say('Would you have an ID proof? I want to have your Aadhar card number...')
+        engine.runAndWait()
+
+        with sr.Microphone(sample_rate=16000, chunk_size=512) as source:
+            print('Please say something.....')
+            engine.say('Speaking completed..')
+            voice = listener.listen(source)
+            aadhar_number = listener.recognize_google(voice)
+            aadhar_number = aadhar_number.lower()
+            print(aadhar_number)
+            engine.runAndWait()
+
+            engine.say('Give one xerox copy at the reception')
+            engine.runAndWait()
+
+        with sr.Microphone(sample_rate=16000, chunk_size=512) as source:
+            print('Please say something.....')
+            engine.say('Speaking completed..')
+            voice = listener.listen(source)
+            command = listener.recognize_google(voice)
+            command = command.lower()
+            print(command)
+
+            engine.runAndWait()
+            engine.say("Last one! Tell me your mobile number")
+            engine.runAndWait()
+
+        with sr.Microphone(sample_rate=16000, chunk_size=512) as source:
+            print('Please say something.....')
+            engine.say('Speaking completed..')
+            voice = listener.listen(source)
+            mobile_number = listener.recognize_google(voice)
+            mobile_number = mobile_number.lower()
+            print(mobile_number)
+            engine.runAndWait()
+            engine.say("Your details are collected successfully")
+            engine.say("Enjoy your day!")
+            engine.say("Bye, now you can go inside the hotel")
+            engine.runAndWait()
+
+        # Insert the collected data into the database
+        insert_query = "INSERT INTO guest(name, address, aadhar_number, mobile_number) VALUES (%s, %s, %s, %s)"
+        values = (name, address, aadhar_number, mobile_number)
+
+        try:
+            cursor.execute(insert_query, values)
+            connection.commit()
+            print("Data inserted successfully!")
+        except Error as e:
+            print("Error inserting data into MySQL table:", e)
+
+        if cv2.waitKey(10) == ord('q'):
+            break
+
+    cv2.imshow('camera.jpg', frame1)
+
+# Release the camera and close windows
+cam.release()
+cv2.destroyAllWindows()
+
+# Close the database connection
+connection.close()
